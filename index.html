@@ -644,11 +644,9 @@ $("genBtn").addEventListener("click", async () => {
     $("resultVideo").src = out;
     $("resultVideo").classList.remove("hidden");
     $("resultVideo").play().catch(()=>{});
-    const dl = $("dlResultBtn");
-    dl.classList.remove("hidden");
-    dl.onclick = () => window.open(out, "_blank");
+    setupSaveButton(out, st);
     st.className = "status ok";
-    st.textContent = "✅ 生成完了！";
+    st.textContent = "✅ 生成完了！下のボタンからカメラロールに保存できます";
   }catch(err){
     st.className = "status err";
     st.textContent = "エラー: " + err.message;
@@ -664,6 +662,51 @@ async function uploadToReplicate(worker, blob, filename){
   const j = await r.json();
   if(!r.ok) throw new Error("アップロード失敗: " + (j.detail || r.status));
   return (j.urls && j.urls.get) || j.url;
+}
+
+/* ============ 結果の保存（カメラロール対応） ============ */
+let savedFile = null;
+function setupSaveButton(url, st){
+  const dl = $("dlResultBtn");
+  dl.classList.remove("hidden");
+  savedFile = null;
+  dl.textContent = "📥 カメラロールに保存";
+
+  dl.onclick = async () => {
+    /* 2回目タップ: 取得済みファイルを共有シートで保存 */
+    if(savedFile){
+      try{
+        await navigator.share({files:[savedFile]});
+      }catch(e){ /* キャンセル時は何もしない */ }
+      return;
+    }
+    /* 1回目タップ: 動画をダウンロード */
+    try{
+      dl.disabled = true;
+      dl.textContent = "動画を取得中…";
+      const r = await fetch(url);
+      const blob = await r.blob();
+      const file = new File([blob], "dance_result.mp4", {type: "video/mp4"});
+
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        savedFile = file;
+        dl.disabled = false;
+        dl.textContent = "✅ 準備OK！もう一度タップ → 「ビデオを保存」";
+      }else{
+        /* 共有シート非対応環境: 通常ダウンロード */
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "dance_result.mp4";
+        a.click();
+        dl.disabled = false;
+        dl.textContent = "📥 カメラロールに保存";
+      }
+    }catch(e){
+      dl.disabled = false;
+      dl.textContent = "📥 カメラロールに保存";
+      window.open(url, "_blank");
+    }
+  };
 }
 </script>
 </body>
